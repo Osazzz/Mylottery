@@ -3,7 +3,7 @@ pragma solidity ^0.8.7;
 
 contract Lottery {
     address public owner; // Owner;
-    address payable[] public allPlayers; // dynamic array with all player's address which is payable;
+    address payable[] private allPlayers; // dynamic array with all player's address which is payable;
     uint lotteryNo; // keep track of lotteries like how much lottries are done;
 
     mapping (uint => address payable) public winners;
@@ -32,7 +32,7 @@ contract Lottery {
     // Enter the lottery
     function addLottery() public payable {
         // require a lottery balance before executing below lines.
-        require(msg.value > 0.1 ether);
+        require(msg.value > 0.1 ether, "Can't add lottery for free");
 
         // If ethers are there then add the address.
         allPlayers.push(payable(msg.sender));
@@ -45,13 +45,16 @@ contract Lottery {
 
     // getting winner using random number
     function winner() public onlyOwner {
+        // Check if there is an open lottery 
+        require(allPlayers.length > 0, "No lottery currently open");
+
         uint256 index = randomNumber() % allPlayers.length;
         allPlayers[index].transfer(address(this).balance);
-        lotteryNo++;
         winners[lotteryNo] = allPlayers[index];
+        lotteryNo++;
            
         // clear the players
-        allPlayers = new address payable[](0);
+        delete allPlayers;
     }
 
     modifier onlyOwner() {
