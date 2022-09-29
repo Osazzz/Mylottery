@@ -1,17 +1,22 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.7;
 
-contract Lottery {
-    address public owner; // Owner;
-    address payable[] public allPlayers; // dynamic array with all player's address which is payable;
-    uint lotteryNo; // keep track of lotteries like how much lottries are done;
+import "@openzeppelin/contracts/utils/Counters.sol";
 
-    mapping (uint => address payable) public winners;
+contract Lottery {
+
+    using Counters for Counters.Counter;
+
+    address public owner; // Owner;
+    address payable[] private allPlayers; // dynamic array with all player's address which is payable;
+    Counters.Counter public lotteryNo; // keep track of lotteries like how much lottries are done;
+
+    mapping (uint => address payable) private winners;
 
     constructor() {
         // adding the address of owner
         owner = msg.sender;
-        lotteryNo = 1;
+        lotteryNo.increment();
     }
 
     // get balance
@@ -32,30 +37,35 @@ contract Lottery {
     // Enter the lottery
     function addLottery() public payable {
         // require a lottery balance before executing below lines.
-        require(msg.value > 0.1 ether);
+        require(msg.value > 0.1 ether, "Kindly pay the entry fees!!");
 
         // If ethers are there then add the address.
         allPlayers.push(payable(msg.sender));
     }
 
     // Get random number by using keccak256 algorithm ( Not a stable thing to do)
-    function randomNumber() public view returns (uint256) {
+    function randomNumber() private view returns (uint256) {
         return uint256(keccak256(abi.encodePacked(owner, block.timestamp)));
     }
 
     // getting winner using random number
     function winner() public onlyOwner {
         uint256 index = randomNumber() % allPlayers.length;
-        allPlayers[index].transfer(address(this).balance);
-        lotteryNo++;
-        winners[lotteryNo] = allPlayers[index];
+
+        (bool sent, bytes memory data) = allPlayers[index].call{value: address(this).balance}("");
+
+        require(sent, "Transaction failed. Please try again");
+
+        winners[lotteryNo.current()] = allPlayers[index];
            
+        lotteryNo.increment();
+
         // clear the players
         allPlayers = new address payable[](0);
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "Operation not allowed!");
         _;
     }
 }
