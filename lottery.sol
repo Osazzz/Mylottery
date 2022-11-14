@@ -3,10 +3,10 @@ pragma solidity ^0.8.7;
 
 contract Lottery {
     address public owner; // Owner;
-    address payable[] public allPlayers; // dynamic array with all player's address which is payable;
-    uint lotteryNo; // keep track of lotteries like how much lottries are done;
+    address[] public allPlayers; // dynamic array with all player's address;
+    uint256 public lotteryNo; // keep track of lotteries like how much lottries are done;
 
-    mapping (uint => address payable) public winners;
+    mapping (uint256 => address) public winners;
 
     constructor() {
         // adding the address of owner
@@ -14,48 +14,52 @@ contract Lottery {
         lotteryNo = 1;
     }
 
-    // get balance
+    /// @dev get balance
     function get_balance() public view returns (uint256) {
         return address(this).balance;
     }
 
-    // Get all players
-    function get_players() public view returns (address payable[] memory) {
+    /// @dev Get all players
+    function get_players() public view returns (address[] memory) {
         return allPlayers;
     }
 
-    // get lottery winners by lottery ID.
-    function get_winners(uint _lotteryId) public view returns (address payable) {
+    /// @dev get lottery winners by lottery ID.
+    function get_winners(uint _lotteryId) public view returns (address) {
         return winners[_lotteryId];
     }
 
-    // Enter the lottery
+    /// @dev Enter the lottery
     function addLottery() public payable {
         // require a lottery balance before executing below lines.
-        require(msg.value > 0.1 ether);
+        require(msg.value > 0.1 ether, "not enough deposit");
 
         // If ethers are there then add the address.
-        allPlayers.push(payable(msg.sender));
+        allPlayers.push(msg.sender);
     }
 
-    // Get random number by using keccak256 algorithm ( Not a stable thing to do)
-    function randomNumber() public view returns (uint256) {
+    /// @dev Get random number by using keccak256 algorithm ( Not a stable thing to do)
+    function randomNumber() internal view returns (uint256) {
         return uint256(keccak256(abi.encodePacked(owner, block.timestamp)));
     }
 
-    // getting winner using random number
+    /// @dev getting winner using random number
     function winner() public onlyOwner {
         uint256 index = randomNumber() % allPlayers.length;
-        allPlayers[index].transfer(address(this).balance);
+        address winner = allPlayers[index];
+        winners[lotteryNo] = winner;
         lotteryNo++;
-        winners[lotteryNo] = allPlayers[index];
            
         // clear the players
-        allPlayers = new address payable[](0);
+        delete allPlayers;
+
+        // prevent reentrancy attacks
+        (bool success, ) = payable(winner).call{ value: address(this).balance }("");
+        require(success, "failed to transfer");
     }
 
     modifier onlyOwner() {
-        require(msg.sender == owner);
+        require(msg.sender == owner, "not owner");
         _;
     }
 }
